@@ -3,7 +3,7 @@
 
 GuessPoseGame::GuessPoseGame()
 {
-    rng = std::default_random_engine{};
+    rng = std::mt19937{};
     // reset();
 }
 

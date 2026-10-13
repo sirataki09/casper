@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 20)
 set(GLAD_VER 4.3)
 
+# The upstream project is Windows-first.  Keep that build untouched below and
+# use a separate, simulation-only definition when configuring on macOS.
+if(APPLE)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos-simulation.cmake")
+    return()
+endif()
+
 # set(USE_PYLON true)  # uncomment if using basler camera
 set(USE_LEAP true)  # uncomment if using leap motion
 

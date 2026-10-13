@@ -3,7 +3,7 @@
 
 GuessCharGame::GuessCharGame()
 {
-    rng = std::default_random_engine{};
+    rng = std::mt19937{};
     totalSessionCounter = 0;
     initialized = false;
     // reset();

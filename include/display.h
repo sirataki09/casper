@@ -2,7 +2,10 @@
 #define DYNAFLASH_H
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
+#ifdef _WIN32
 #include <windows.h>
+#include "DynaFlash.h"
+#endif
 #include <stdio.h>
 #include <iostream>
 #include <string.h>
@@ -10,7 +13,6 @@
 #include "opencv2/opencv.hpp"
 #include "readerwritercircularbuffer.h"
 #include <thread>
-#include "DynaFlash.h"
 #ifdef PYTHON_BINDINGS_BUILD
 #include <nanobind/ndarray.h>
 #include <nanobind/nanobind.h>
@@ -79,6 +81,7 @@ private:
     // bool m_save_to_disk = false;
 };
 
+#ifdef _WIN32
 class DynaFlashProjector : public Display
 {
 public:
@@ -163,4 +166,20 @@ NB_MODULE(dynaflash, m)
         .def("project", &DynaFlashProjector::project, nb::arg("data"), nb::arg("bgr") = true, "projects an arbitrary numpy array of type uint8, with shape (height, width, 3), bgr");
 }
 #endif
-#endif DYNAFLASH_H
+#else
+class DynaFlashProjector : public Display
+{
+public:
+    DynaFlashProjector(bool = false, bool = false, int = 20, bool verbose = false)
+        : Display(DYNA_FRAME_HEIGHT, DYNA_FRAME_WIDTH, 3, verbose) {}
+    bool init() override { return false; }
+    uint8_t *get_buffer() override { return nullptr; }
+    void show() override {}
+    void show(cv::Mat) override {}
+    void show_buffer(uint8_t *) override {}
+    void kill() override {}
+    bool is_initialized() { return false; }
+};
+#endif
+
+#endif // DYNAFLASH_H

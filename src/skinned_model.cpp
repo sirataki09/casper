@@ -36,6 +36,13 @@ void SkinnedModel::Clear()
 
 bool SkinnedModel::LoadMesh(const std::string &Filename)
 {
+    // Keep an earlier OpenGL error from being reported as an Assimp/mesh error.
+    for (GLenum prior_error = glGetError(); prior_error != GL_NO_ERROR; prior_error = glGetError())
+    {
+        std::cout << "OpenGL error before loading mesh '" << Filename
+                  << "': 0x" << std::hex << prior_error << std::dec << std::endl;
+    }
+
     // Release the previously loaded mesh (if it exists)
     Clear();
 
@@ -115,7 +122,13 @@ bool SkinnedModel::InitFromScene(const aiScene *pScene, const std::string &Filen
 
     PopulateBuffers();
 
-    return glGetError() == GL_NO_ERROR;
+    const GLenum gl_error = glGetError();
+    if (gl_error != GL_NO_ERROR)
+    {
+        std::cout << "OpenGL error while loading mesh '" << Filename
+                  << "': 0x" << std::hex << gl_error << std::dec << std::endl;
+    }
+    return gl_error == GL_NO_ERROR;
 }
 
 void SkinnedModel::CountVerticesAndIndices(const aiScene *pScene, unsigned int &NumVertices, unsigned int &NumIndices)

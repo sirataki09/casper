@@ -176,11 +176,11 @@ vec4 CalcPointLight(PointLight l, vec3 Normal)
     LightDirection = normalize(LightDirection);
 
     vec4 Color = CalcLightInternal(l.Base, LightDirection, Normal, vec3(1.0, 1.0, 1.0));
-    float Attenuation =  l.Atten.Constant +
-                         l.Atten.Linear * Distance +
-                         l.Atten.Exp * Distance * Distance;
+    float attenuationValue = l.Atten.Constant +
+                             l.Atten.Linear * Distance +
+                             l.Atten.Exp * Distance * Distance;
 
-    return Color / Attenuation;
+    return Color / attenuationValue;
 }
 
 vec4 CalcSpotLight(SpotLight l, vec3 Normal)
@@ -245,7 +245,7 @@ void main()
             for (int i = 0; i < gNumSpotLights; i++) {
                 TotalLight += CalcSpotLight(gSpotLights[i], Normal);
             }
-            FragColor = texture2D(src, TexCoord0.xy) * TotalLight;
+            FragColor = texture(src, TexCoord0.xy) * TotalLight;
         }
         else
         {

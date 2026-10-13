@@ -14,6 +14,7 @@
 #include "cxxopts.h"
 #include "camera.h"
 #include "gl_camera.h"
+#include <opencv2/geometry/3d.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include "shader.h"
 #include "engine_state.h"
@@ -405,7 +406,9 @@ std::vector<glm::vec2> projected_left_prev, projected_right_prev;
 /* main */
 int main(int argc, char *argv[])
 {
+#ifndef CASPER_SIMULATION_ONLY
     nvtxNameOsThread(GetCurrentThreadId(), "Casper: Main Thread");
+#endif
     t_app.start();
     /* parse cmd line options */
     cxxopts::Options options("casper", "casper.exe: A graphics engine for performing projection mapping onto human hands");
@@ -462,7 +465,28 @@ int main(int argc, char *argv[])
     }
     /* embedded python init */
     Py_Initialize();
+#ifdef CASPER_SIMULATION_ONLY
+    // Embedded Python does not automatically activate a venv. Add both the
+    // executable directory (predict.py/chatgpt.py) and dm's installed packages.
+    PyObject *python_path = PySys_GetObject("path"); // borrowed reference
+    PyObject *current_directory = PyUnicode_FromString(".");
+    PyObject *site_packages = PyUnicode_FromString(CASPER_PYTHON_SITE_PACKAGES);
+    if (!python_path || !current_directory || !site_packages ||
+        PyList_Insert(python_path, 0, current_directory) != 0 ||
+        PyList_Insert(python_path, 0, site_packages) != 0)
+    {
+        PyErr_Print();
+        std::cerr << "Failed to configure the dm Python environment." << std::endl;
+        Py_XDECREF(current_directory);
+        Py_XDECREF(site_packages);
+        return -1;
+    }
+    Py_DECREF(current_directory);
+    Py_DECREF(site_packages);
+#endif
+#ifndef CASPER_SIMULATION_ONLY
     controlNetClient.init();
+#endif
     import_array();
     myModule = PyImport_ImportModule("predict");
     if (!myModule)
@@ -500,7 +524,12 @@ int main(int argc, char *argv[])
     /* init GLFW */
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+#endif
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE); // disable resizing
     int num_of_monitors;
@@ -532,7 +561,12 @@ int main(int argc, char *argv[])
     glViewport(0, 0, es.proj_width, es.proj_height); // set viewport
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glPointSize(10.0f);
+#ifdef __APPLE__
+    // Apple's 4.1 Core Profile only guarantees a line width of 1 pixel.
+    glLineWidth(1.0f);
+#else
     glLineWidth(5.0f);
+#endif
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
@@ -4282,7 +4316,9 @@ void landmarkDetectionThread(std::vector<glm::vec3> projected_filtered_left,
                              std::vector<float> rendered_depths_right,
                              bool isRightHandVis)
 {
+#ifndef CASPER_SIMULATION_ONLY
     nvtxNameOsThread(GetCurrentThreadId(), "Casper: Landmark Detection Thread");
+#endif
     // nvtx3::scoped_range range("MP Landmark Detection");
     t_mls_thread.start();
     try
@@ -5353,23 +5389,53 @@ void handleSimulation(std::unordered_map<std::string, Shader *> &shaderMap,
     {
         if (es.debug_playback)
         {
+            bool playback_active = false;
             if (es.canUseRecordedImages)
             {
-                if (!playVideoReal(shaderMap,
-                                   leftHandModel,
-                                   rightHandModel,
-                                   textModel,
-                                   cam_view_transform,
-                                   cam_projection_transform))
+                playback_active = playVideoReal(shaderMap,
+                                                leftHandModel,
+                                                rightHandModel,
+                                                textModel,
+                                                cam_view_transform,
+                                                cam_projection_transform);
+            }
+            else
+            {
+                // The repository's bundled all_10s recording contains poses
+                // but no camera PNGs. Render a synthetic camera view from the
+                // hand mesh so the simulation still has visible output.
+                playback_active = playVideo(shaderMap,
+                                            leftHandModel,
+                                            rightHandModel,
+                                            textModel,
+                                            cam_view_transform,
+                                            cam_projection_transform);
+            }
+#ifdef CASPER_SIMULATION_ONLY
+            static bool synthetic_frame_checked = false;
+            if (playback_active && !es.canUseRecordedImages && !synthetic_frame_checked)
+            {
+                std::vector<uint8_t> frame_pixels(es.proj_width * es.proj_height * 3);
+                glReadPixels(0, 0, es.proj_width, es.proj_height,
+                             GL_RGB, GL_UNSIGNED_BYTE, frame_pixels.data());
+                const bool has_visible_pixels = std::any_of(
+                    frame_pixels.begin(), frame_pixels.end(),
+                    [](uint8_t value) { return value != 0; });
+                std::cout << "Synthetic simulation frame contains visible pixels: "
+                          << (has_visible_pixels ? "yes" : "no") << std::endl;
+                synthetic_frame_checked = true;
+            }
+#endif
+            if (!playback_active)
+            {
+                es.simulationTime = 0.0f; // continuous video playback
+                es.video_reached_end = false;
+                if (es.save_sim_data)
                 {
-                    es.simulationTime = 0.0f; // continuous video playback
-                    if (es.save_sim_data)
-                    {
-                        saveSimData();
-                        es.save_sim_data = false;
-                        es.cur_sim_time.clear();
-                        es.cur_sim_data.clear();
-                    }
+                    saveSimData();
+                    es.save_sim_data = false;
+                    es.cur_sim_time.clear();
+                    es.cur_sim_data.clear();
                 }
             }
         }

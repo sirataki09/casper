@@ -42,7 +42,14 @@ public:
     LEAP_CONNECTION *getConnectionHandle(void) { return &connectionHandle; };
     LEAP_DEVICE_INFO *GetDeviceProperties(void);
     void setDevice(const LEAP_DEVICE_INFO *deviceProps);
-    int64_t LeapGetTime() { return LeapGetNow(); };
+    int64_t LeapGetTime()
+    {
+#ifdef CASPER_SIMULATION_ONLY
+        return 0;
+#else
+        return LeapGetNow();
+#endif
+    };
     void setFrame(const LEAP_TRACKING_EVENT *frame);
     LEAP_TRACKING_EVENT *getFrame();
     void setImage(const LEAP_IMAGE_EVENT *imageEvent);

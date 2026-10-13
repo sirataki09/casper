@@ -7,6 +7,8 @@
 #include "fbo.h"
 #include "skinned_model.h"
 #include <glad/glad.h>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/geometry/2d.hpp>
 
 class PostProcess
 {
@@ -47,4 +49,4 @@ private:
     unsigned int m_FBO[2] = {0};
     unsigned int m_pingpong_textures[2] = {0};
 };
-#endif POSTPROCESS
+#endif // POSTPROCESS_H

@@ -97,6 +97,7 @@ void SaveToDisk::kill()
 	}
 };
 
+#ifdef _WIN32
 bool DynaFlashProjector::init()
 {
 	if (initialized)
@@ -360,3 +361,4 @@ void DynaFlashProjector::show_buffer_internal(uint8_t *buffer)
 		// free((void *)pFrameData);
 	}
 }
+#endif

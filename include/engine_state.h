@@ -181,7 +181,11 @@ public:
     float skin_brightness = 0.5f;
     float simulationTime = 0.0f;
     bool recordImages = false;
+#ifdef CASPER_SIMULATION_ONLY
+    std::string recording_name = "all_10s";
+#else
     std::string recording_name = "test"; // all_10s
+#endif
     std::string output_recording_name = "video";
     std::string subject_name = "subject1";
     std::string loaded_session_name = "";

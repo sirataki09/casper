@@ -562,7 +562,8 @@ bool ControlNetClient::inference(const std::vector<uint8_t> &raw_data,
     }
 }
 
-ChatGPTClient::ChatGPTClient(bool pyinit) : m_initialized(false), m_pyinit(pyinit) {}
+ChatGPTClient::ChatGPTClient(bool pyinit)
+    : m_initialized(false), m_pyinit(pyinit), py_chatgpt(nullptr), py_chatgpt_client(nullptr) {}
 
 bool ChatGPTClient::init()
 {
@@ -590,8 +591,8 @@ bool ChatGPTClient::init()
 
 ChatGPTClient::~ChatGPTClient()
 {
-    Py_DECREF(py_chatgpt_client);
-    Py_DECREF(py_chatgpt);
+    Py_XDECREF(py_chatgpt_client);
+    Py_XDECREF(py_chatgpt);
     if (m_pyinit)
         Py_Finalize();
 }

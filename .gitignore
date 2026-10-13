@@ -1,5 +1,8 @@
 .vscode/settings.json
 /build
+/build-macos
+/dm
+.DS_Store
 /third-party/opencv
 /debug
 resource/calibrations/cam_calibration/*.png

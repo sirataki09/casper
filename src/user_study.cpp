@@ -5,8 +5,7 @@ namespace fs = std::filesystem;
 
 UserStudy::UserStudy()
 {
-    rng = std::default_random_engine{};
-    rng.seed(std::random_device{}());
+    rng = std::mt19937{std::random_device{}()};
     reset();
 }
 

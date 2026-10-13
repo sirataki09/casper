@@ -114,7 +114,11 @@ SkinningShader::SkinningShader(const std::string &vertexPath, const std::string 
     {
         char Name[128];
         memset(Name, 0, sizeof(Name));
+#ifdef _WIN32
         _snprintf_s(Name, sizeof(Name), "gBones[%d]", i);
+#else
+        snprintf(Name, sizeof(Name), "gBones[%d]", i);
+#endif
         m_boneLocation[i] = GetUniformLocation(Name);
     }
 };

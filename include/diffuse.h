@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <iostream>
 #include "opencv2/opencv.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/geometry/2d.hpp"
 #include "json.hpp"
 #ifdef _DEBUG
 #undef _DEBUG
