@@ -163,6 +163,15 @@ cd /Users/takumi/ws/casper/build/bin
 
 初期状態では、リポジトリに含まれる `resource/recordings/all_10s` を再生します。右クリックで設定GUIを開けます。
 
+専用カメラとプロジェクターを疑似化したSandboxは次のコマンドで起動します。
+
+```bash
+cd /Users/takumi/ws/casper/build/bin
+./casper --simcam --simproj
+```
+
+公式Windows版では、この指定はカメラとプロジェクターだけを疑似化し、手姿勢にはLeap Motion実機を使用します。Mac版にはLeap Motion実機のバックエンドがないため、同梱の`all_10s`を疑似Leap入力として繰り返し再生します。起動時から設定GUIを表示し、通常のマウスカーソルを使用できます。
+
 ### 8. Mac版で問題が起きたときの確認項目
 
 #### `Python` または `NumPy` が見つからない
@@ -213,6 +222,7 @@ cd /Users/takumi/ws/casper/build/bin
 - 最初のフレームに黒以外の画素があること: 成功（ログの末尾が `Synthetic simulation frame contains visible pixels: yes`）
 - 終了コード: `0`
 - `./casper --simcam --simproj`でSandboxを起動し、Leap Motion未接続でもクラッシュしないこと: 成功
+- Mac版の疑似Sandboxで保存済み手姿勢を再生し、GUIと通常カーソルを操作できること: 成功
 
 MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single signature inference` という `W...` 行は、CPU推論バックエンドとモデル機能に関する通知です。Casperの初期化失敗ではありません。`ERROR::`、Python例外、OpenGLエラー、または終了コードが0以外の場合は、この節の成功状態とは異なります。
 
@@ -277,6 +287,9 @@ MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single
   - 同梱の `all_10s` には手姿勢の `.npy` だけがあり、カメラ画像PNGはありません。画像がある記録では元の実写再生処理を使い、画像がない記録では既存の仮想カメラ描画処理へ自動的に切り替えます。再生終了後はどちらも先頭へ戻して連続再生します。
   - 骨格のみのMacシミュレーションでは、最初の描画後に画面の画素を一度だけ検査し、黒以外の画素があれば `Synthetic simulation frame contains visible pixels: yes` と表示します。画面表示を自動検証するための診断で、以後のフレームには負荷を加えません。
   - Mac版のSandboxではLeap Motion SDKを読み込まないため、実機未接続時のLeap取得要求を安全に`LEAP_NONEWFRAME`として扱います。`--simcam --simproj`が実Leap APIへ進んでNULLアドレスを実行することを防ぎます。
+  - Mac版で`--simcam --simproj`を指定した場合は、同梱の保存骨格を疑似Leap入力として再生します。公式Windows版の白い疑似カメラだけでは手を描画できないため、既存の仮想カメラ描画経路を使用し、SandboxのGUIを表示したまま結果を確認できるようにしました。
+  - Mac版の実機なしSandboxは起動時からGUIを有効にします。公式Sandboxの自由視点操作ではカーソルを捕捉しますが、黒画面でフリーズしたように見えることを避けるためです。
+  - Mac版は画面内シミュレーションなので、DynaFlash向けの無制限描画を行わず、ディスプレイの垂直同期を有効にします。`--simcam --simproj`が数百FPSで空回りしてCPUを過剰に使用し、操作が固まったように見えることを防ぎます。Windowsの実機向け設定は変更しません。
 - `src/diffuse.cpp`
   - 初期化を省略したChatGPTクライアントも安全に破棄できるよう、Pythonオブジェクトのポインターを `nullptr` で初期化し、破棄にはnull対応の `Py_XDECREF` を使用します。
 

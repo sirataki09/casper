@@ -557,7 +557,14 @@ int main(int argc, char *argv[])
     std::cout << "  GLSL Version : " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
     std::cout << std::endl;
     deformationGrid.initGLBuffers();
+#ifdef CASPER_SIMULATION_ONLY
+    // The macOS build targets an on-screen simulation, not a 1000 FPS
+    // DynaFlash device. V-sync keeps the event loop responsive and prevents
+    // the virtual Sandbox from consuming an entire CPU core unnecessarily.
+    glfwSwapInterval(1);
+#else
     glfwSwapInterval(0);                             // do not sync to monitor
+#endif
     glViewport(0, 0, es.proj_width, es.proj_height); // set viewport
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glPointSize(10.0f);
@@ -575,7 +582,11 @@ int main(int argc, char *argv[])
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
+#ifdef CASPER_SIMULATION_ONLY
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+#else
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+#endif
     /* Setup Dear ImGui context */
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -666,6 +677,37 @@ int main(int argc, char *argv[])
                                            es.cam_width, es.cam_height, false);
     switch (es.operation_mode) // set some default values for user study depending on cmd line
     {
+    case static_cast<int>(OperationMode::SANDBOX):
+    {
+#ifdef CASPER_SIMULATION_ONLY
+        if (es.simulated_camera && es.simulated_projector)
+        {
+            // A hardware-free macOS Sandbox has no live Leap input. Keep the
+            // GUI and cursor available, and use the bundled recording as the
+            // virtual hand source while retaining the Sandbox controls.
+            es.activateGUI = true;
+            es.postprocess_mode = static_cast<int>(PostProcessMode::OVERLAY);
+            es.mask_missing_color_is_camera = true;
+            es.mask_unused_info_color = es.mask_bg_color;
+            es.mls_blocking = true;
+            es.use_coaxial_calib = false;
+            es.deformation_mode = static_cast<int>(DeformationMode::SIMILARITY);
+            es.pseudo_vid_playback_speed = 0.1f;
+            if (!loadSession())
+            {
+                std::cout << "Failed to load virtual Sandbox recording: " << es.recording_name << std::endl;
+            }
+            else
+            {
+                es.simulationTime = 0.0f;
+                es.texture_mode = static_cast<int>(TextureMode::FROM_FILE);
+                std::cout << "macOS virtual Sandbox: using recorded hand poses from "
+                          << es.recording_name << std::endl;
+            }
+        }
+#endif
+        break;
+    }
     case static_cast<int>(OperationMode::SIMULATION):
     {
         es.postprocess_mode = static_cast<int>(PostProcessMode::OVERLAY);
@@ -982,6 +1024,23 @@ int main(int argc, char *argv[])
         {
         case static_cast<int>(OperationMode::SANDBOX):
         {
+#ifdef CASPER_SIMULATION_ONLY
+            if (es.simulated_camera && es.simulated_projector && es.pre_recorded_session_loaded)
+            {
+                bool playback_active = playVideo(es.shaderMap,
+                                                 leftHandModel,
+                                                 rightHandModel,
+                                                 textModel,
+                                                 cam_view_transform,
+                                                 cam_projection_transform);
+                if (!playback_active)
+                {
+                    es.simulationTime = 0.0f;
+                    es.video_reached_end = false;
+                }
+                break;
+            }
+#endif
             /* deal with camera input */
             t_camera.start();
             CGrabResultPtr ptrGrabResult;
