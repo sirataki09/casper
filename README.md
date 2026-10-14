@@ -89,7 +89,8 @@ Mac版の最初の目標は、`resource/recordings` に同梱された手の姿�
 - Homebrew
 - CMake 4.4以降
 - Python 3.11
-- 仮想環境名: `dm`
+- AnacondaまたはMiniconda
+- Conda仮想環境名: `dm`
 
 Intel Macでは未検証です。
 
@@ -98,32 +99,36 @@ Intel Macでは未検証です。
 Homebrewが未導入の場合は、先に[Homebrew公式サイト](https://brew.sh/)の手順で導入してください。その後、ターミナルで次を実行します。
 
 ```bash
-brew install cmake opencv glfw assimp freetype boost python@3.11
+brew install cmake opencv glfw assimp freetype boost
 ```
 
 OpenCVは多数の関連パッケージを導入するため、完了まで時間とディスク容量を必要とします。
 
-### 4. Python仮想環境 `dm` を作る
+### 4. Conda仮想環境 `dm` を作る
 
-リポジトリのルート、つまりこのREADMEがあるディレクトリで実行します。
-
-```bash
-cd /Users/takumi/ws/casper
-/opt/homebrew/bin/python3.11 -m venv dm
-dm/bin/python -m pip install "numpy<2" mediapipe nanobind
-```
-
-仮想環境を有効化して作業したい場合は次を実行します。CMakeにはPythonの絶対パスを渡すため、有効化しなくてもビルドできます。
+Python標準の`venv`ではなく、Conda環境として`dm`を作成します。
 
 ```bash
-source dm/bin/activate
+conda create -n dm python=3.11 -y
+conda activate dm
+python -m pip install "numpy<2" mediapipe nanobind
 ```
 
-終了するときは次を実行します。
+環境が作成されたことは次のコマンドで確認できます。
 
 ```bash
-deactivate
+conda info --envs
+which python
+python --version
 ```
+
+`which python`が`/opt/anaconda3/envs/dm/bin/python`のようなConda環境内のパスを表示すれば正しく有効です。終了するときは次を実行します。
+
+```bash
+conda deactivate
+```
+
+2026年10月15日に、この作業環境はプロジェクト内のPython標準`venv`からConda環境へ移行しました。以前の環境は削除せず、`/Users/takumi/ws/casper/dm-venv-backup-20261015`へ移動して保存しています。通常のビルドや実行ではこのバックアップを使用しません。
 
 ### 5. CMakeを構成する
 
@@ -132,8 +137,10 @@ cd /Users/takumi/ws/casper
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH=/opt/homebrew \
-  -DPython_EXECUTABLE="$PWD/dm/bin/python"
+  -DPython_EXECUTABLE="$CONDA_PREFIX/bin/python"
 ```
+
+このコマンドは`conda activate dm`を実行した状態で使用してください。macOS用CMakeは有効な`CONDA_PREFIX`も自動検出しますが、既存のCMakeキャッシュに別のPythonが記録されている場合に備えて絶対パスを明示しています。
 
 macOSでは `CASPER_MACOS_SIMULATION=ON` が初期値です。Windows専用ハードウェアを誤って有効にしないため、macOSでこの値をOFFにするとCMakeは理由を表示して停止します。
 
@@ -163,7 +170,8 @@ cd /Users/takumi/ws/casper/build/bin
 いったん `build` を残したまま、Pythonの指定を付けてCMakeを再実行します。
 
 ```bash
-cmake -S . -B build -DPython_EXECUTABLE="$PWD/dm/bin/python" -DCMAKE_PREFIX_PATH=/opt/homebrew
+conda activate dm
+cmake -S . -B build -DPython_EXECUTABLE="$CONDA_PREFIX/bin/python" -DCMAKE_PREFIX_PATH=/opt/homebrew
 ```
 
 #### OpenCV、Assimp、GLFWなどが見つからない
@@ -187,8 +195,11 @@ cd /Users/takumi/ws/casper/build/bin
 
 ### 9. この環境で確認できた結果
 
-2026年10月14日に `/Users/takumi/ws/casper` で次を確認しました。
+2026年10月15日に `/Users/takumi/ws/casper` で次を確認しました。
 
+- Conda環境: `dm`（`/opt/anaconda3/envs/dm`）
+- Conda版Python: 3.11.17
+- Conda環境内のNumPy 1.26.4、MediaPipe 1.1.1、nanobind 3.1.0の読込: 成功
 - CMake構成: 成功
 - Releaseビルド: 成功（`build/bin/casper` を生成）
 - OpenGLウィンドウ作成: 成功
@@ -211,17 +222,17 @@ MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single
 ### ビルドと環境
 
 - `.gitignore`
-  - `dm/`、`build-macos/`、`.DS_Store`を追跡対象外に追加しました。
+  - `dm/`、`dm-venv-backup-*`、`build-macos/`、`.DS_Store`を追跡対象外に追加しました。
 - `CMakeLists.txt`
   - macOSの場合だけ `cmake/macos-simulation.cmake` を読み込みます。
   - 既存のWindows向けCMake定義は、その下に変更せず残しています。
 - `cmake/macos-simulation.cmake`（新規）
   - Homebrew版のOpenCV、GLFW、Assimp、FreeType、Boost、zlibを検出します。
-  - `dm` のPythonとNumPyをC++アプリへリンクします。
+  - Conda環境`dm`のPythonとNumPyをC++アプリへリンクします。有効な`CONDA_PREFIX`を優先し、旧venv形式の`dm/bin/python`も互換用の候補として残します。
   - Windows専用ソースとSDKをビルド対象から外します。
   - 実行時の相対パスを維持するため、実行ファイルを `build/bin` に出力します。
   - CMake 3.30以降のBoost検出方針（CMP0167）を明示し、古い検出モジュールに関する警告を防ぎます。
-  - `dm` の `site-packages` をPython自身から取得し、埋め込みPythonへ渡します。ディレクトリが存在しない場合は構成時に分かりやすく停止します。
+  - 使用中のPythonの`site-packages`をPython自身から取得し、埋め込みPythonへ渡します。ディレクトリが存在しない場合は構成時に分かりやすく停止します。
   - C++側で実際に使うOpenCVモジュールだけをリンクします。GUI・カメラ入出力用の `highgui` / `videoio` を外し、MediaPipeに同梱されたPython版OpenCVとのmacOSクラス名衝突を避けます。
 
 ### Windows専用ハードウェアの代替
@@ -259,7 +270,7 @@ MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single
   - Core Profileで廃止された `texture2D` 呼び出しを、同じサンプリング結果を返す `texture` へ変更しました。
 - `src/main.cpp`
   - OpenCV 5でカメラ姿勢推定APIが分離されたため、`Rodrigues`、`solvePnP`、`projectPoints` などを宣言する `opencv2/geometry/3d.hpp` を明示的に追加しました。
-  - macOS版では埋め込みPythonの初期化直後に、実行ディレクトリと `dm` の `site-packages` をモジュール検索パスへ追加します。これにより、コピー済みの `predict.py` / `chatgpt.py` と仮想環境内のNumPy / MediaPipeを読み込めます。
+  - macOS版では埋め込みPythonの初期化直後に、実行ディレクトリとConda環境`dm`の`site-packages`をモジュール検索パスへ追加します。これにより、コピー済みの`predict.py` / `chatgpt.py`と仮想環境内のNumPy / MediaPipeを読み込めます。
   - Macシミュレーションでは使用しないChatGPT/ControlNetクライアントを初期化しません。したがってOpenAIパッケージやAPIキーは、画面内シミュレーションの必須条件ではありません。
   - Apple OpenGL 4.1 Core Profileが保証する範囲に合わせ、macOSだけ線幅を1ピクセルにします。Windowsの5ピクセル設定は維持します。
   - 同梱の `all_10s` には手姿勢の `.npy` だけがあり、カメラ画像PNGはありません。画像がある記録では元の実写再生処理を使い、画像がない記録では既存の仮想カメラ描画処理へ自動的に切り替えます。再生終了後はどちらも先頭へ戻して連続再生します。
@@ -287,7 +298,7 @@ OpenCV 5では三次元幾何とカメラ姿勢推定APIが `opencv2/geometry/3d
 
 #### 起動時に `No module named 'numpy'` / `No module named 'chatgpt'` と表示される
 
-C++へPythonライブラリをリンクするだけでは、埋め込みPythonは仮想環境を自動的に有効化しませんでした。CMakeが `dm` のパッケージ格納先を取得し、アプリがPython初期化直後にその場所と現在の実行ディレクトリを検索パスへ加えるようにしました。このためREADMEの手順どおり `build/bin` から起動する必要があります。
+C++へPythonライブラリをリンクするだけでは、埋め込みPythonはConda環境を自動的に有効化しませんでした。CMakeが使用中のPythonからパッケージ格納先を取得し、アプリがPython初期化直後にその場所と現在の実行ディレクトリを検索パスへ加えるようにしました。このためREADMEの手順どおり`build/bin`から起動する必要があります。
 
 #### `skin.fs` の183行目でGLSL構文エラーになる
 

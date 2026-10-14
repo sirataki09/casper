@@ -2,6 +2,7 @@
 /build
 /build-macos
 /dm
+/dm-venv-backup-*
 .DS_Store
 /third-party/opencv
 /debug
