@@ -212,6 +212,7 @@ cd /Users/takumi/ws/casper/build/bin
 - 骨格のみ録画からの仮想カメラ描画: 成功
 - 最初のフレームに黒以外の画素があること: 成功（ログの末尾が `Synthetic simulation frame contains visible pixels: yes`）
 - 終了コード: `0`
+- `./casper --simcam --simproj`でSandboxを起動し、Leap Motion未接続でもクラッシュしないこと: 成功
 
 MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single signature inference` という `W...` 行は、CPU推論バックエンドとモデル機能に関する通知です。Casperの初期化失敗ではありません。`ERROR::`、Python例外、OpenGLエラー、または終了コードが0以外の場合は、この節の成功状態とは異なります。
 
@@ -275,6 +276,7 @@ MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single
   - Apple OpenGL 4.1 Core Profileが保証する範囲に合わせ、macOSだけ線幅を1ピクセルにします。Windowsの5ピクセル設定は維持します。
   - 同梱の `all_10s` には手姿勢の `.npy` だけがあり、カメラ画像PNGはありません。画像がある記録では元の実写再生処理を使い、画像がない記録では既存の仮想カメラ描画処理へ自動的に切り替えます。再生終了後はどちらも先頭へ戻して連続再生します。
   - 骨格のみのMacシミュレーションでは、最初の描画後に画面の画素を一度だけ検査し、黒以外の画素があれば `Synthetic simulation frame contains visible pixels: yes` と表示します。画面表示を自動検証するための診断で、以後のフレームには負荷を加えません。
+  - Mac版のSandboxではLeap Motion SDKを読み込まないため、実機未接続時のLeap取得要求を安全に`LEAP_NONEWFRAME`として扱います。`--simcam --simproj`が実Leap APIへ進んでNULLアドレスを実行することを防ぎます。
 - `src/diffuse.cpp`
   - 初期化を省略したChatGPTクライアントも安全に破棄できるよう、Pythonオブジェクトのポインターを `nullptr` で初期化し、破棄にはnull対応の `Py_XDECREF` を使用します。
 
@@ -319,6 +321,10 @@ C++アプリがHomebrew版OpenCVの全モジュールをリンクし、MediaPipe
 #### `casper` ウィンドウは開くが真っ黒なまま
 
 同梱の `resource/recordings/all_10s` は、手の骨格・関節・時刻データだけを含み、カメラ画像PNGを含みません。上流の `simulation` 分岐はPNGがある場合にしか描画関数を呼ばないため、ウィンドウだけが黒く表示されていました。Mac版ではPNGがない場合、上流に元からある `playVideo` の仮想カメラ経路で、FBXの手モデルから背景用の手画像と投影結果を生成します。
+
+#### `--simcam --simproj`で`EXC_BAD_ACCESS`が発生する
+
+この指定はカメラとプロジェクターだけを疑似化し、通常のSandboxと同様にLeap Motionから手姿勢を取得しようとします。Mac版はUltraleap SDKをスタブ化しているため、上流処理がNULLの接続ハンドルから実Leap APIを呼び、`getLeapFrame`内でセグメンテーションフォルトになっていました。Macシミュレーションビルドでは実機未接続を検出し、新規Leapフレームなしとして安全に処理を続けるようにしました。この修正はクラッシュを防ぐものであり、Sandboxへ仮想的な手姿勢を供給するものではありません。
 
 ### OpenGL互換性
 

@@ -2541,6 +2541,22 @@ LEAP_STATUS getLeapFrame(LeapCPP &leap, const int64_t &targetFrameTime,
                          int64_t &curFrameID,
                          int64_t &curFrameTimeStamp)
 {
+#ifdef CASPER_SIMULATION_ONLY
+    // The macOS simulation build intentionally does not load the Ultraleap
+    // runtime. Sandbox mode still calls this function even with --simcam and
+    // --simproj, so return safely instead of entering the real Leap C API with
+    // the stub's null connection handle.
+    if (!leap.IsConnected)
+    {
+        bones_to_world_left.clear();
+        bones_to_world_right.clear();
+        joints_left.clear();
+        joints_right.clear();
+        leftFingersExtended.clear();
+        rightFingersExtended.clear();
+        return LEAP_STATUS::LEAP_NONEWFRAME;
+    }
+#endif
     // nvtx3::scoped_range range("getLeapFrame");
     //  some defs
     // t_profile1.start();
