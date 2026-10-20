@@ -226,6 +226,37 @@ cd /Users/takumi/ws/casper/build/bin
 
 MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single signature inference` という `W...` 行は、CPU推論バックエンドとモデル機能に関する通知です。Casperの初期化失敗ではありません。`ERROR::`、Python例外、OpenGLエラー、または終了コードが0以外の場合は、この節の成功状態とは異なります。
 
+## GitHubでmacOS版とWindows版を並行して管理する
+
+このリポジトリでは、公式リポジトリを`upstream`、個人のforkを`origin`として扱います。ブランチは次の役割に分けます。
+
+- `main`: macOSとWindowsで共有する安定版
+- `macos-work`: macOSでの作業ブランチ
+- `windows-work`: Windowsでの作業ブランチ。Windowsへcloneした後に`main`から作成します。
+- `upstream/master`: 公式Casperの履歴
+
+Macで作業を始めるときは、次のコマンドを実行します。
+
+```bash
+cd /Users/takumi/ws/casper
+git switch macos-work
+git pull --ff-only origin macos-work
+```
+
+Windowsでは、`build`やConda環境をMacからコピーせず、ソースと履歴だけをGitHubから取得します。
+
+```powershell
+git clone https://github.com/sirataki09/casper.git C:\Users\<ユーザー名>\ws\casper
+cd C:\Users\<ユーザー名>\ws\casper
+git switch main
+git switch -c windows-work
+git push -u origin windows-work
+```
+
+各環境の変更はそれぞれの作業ブランチへpushし、両環境で共有したい変更だけをPull Requestで`main`へ統合します。統合後は、各作業ブランチへ`main`をmergeして取り込みます。相手側の作業ブランチを直接pullしません。
+
+GitHubへ引き継ぐのは、Gitが追跡しているソース、ヘッダー、CMake設定、`resource`、`third-party`、READMEなどです。`build`、`build-macos`、`build-windows`、`debug`、Conda環境、Pythonキャッシュ、Visual Studioの個人設定は各PCで生成されるため、`.gitignore`で追跡対象外にしています。既存ファイルを削除する必要はありません。
+
 ## 公式リポジトリから変更した点（Mac移植ログ）
 
 元にした公式コミットは `b85af5c2964ab372897601fa7228f7e156048d68` です。既存ファイルは削除していません。Windows向け処理は残し、macOS時だけ別経路を選ぶ方針です。
@@ -234,6 +265,9 @@ MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single
 
 - `.gitignore`
   - `dm/`、`dm-venv-backup-*`、`build-macos/`、`.DS_Store`を追跡対象外に追加しました。
+  - macOSとWindowsを同じGitHubリポジトリで管理するため、`build-windows/`、Visual Studioの`.vs/`とユーザー設定、Windowsのメタデータ、Pythonキャッシュも追跡対象外にしました。
+- `README.md`
+  - `origin`を個人fork、`upstream`を公式リポジトリとして扱い、`main`、`macos-work`、`windows-work`を分ける並行開発手順を追加しました。
 - `CMakeLists.txt`
   - macOSの場合だけ `cmake/macos-simulation.cmake` を読み込みます。
   - 既存のWindows向けCMake定義は、その下に変更せず残しています。
