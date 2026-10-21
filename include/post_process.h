@@ -8,7 +8,9 @@
 #include "skinned_model.h"
 #include <glad/glad.h>
 #include <opencv2/imgproc.hpp>
+#if __has_include(<opencv2/geometry/2d.hpp>)
 #include <opencv2/geometry/2d.hpp>
+#endif
 
 class PostProcess
 {

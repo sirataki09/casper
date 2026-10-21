@@ -184,7 +184,7 @@ public:
 #ifdef CASPER_SIMULATION_ONLY
     std::string recording_name = "all_10s";
 #else
-    std::string recording_name = "test"; // all_10s
+    std::string recording_name = "all_10s";
 #endif
     std::string output_recording_name = "video";
     std::string subject_name = "subject1";

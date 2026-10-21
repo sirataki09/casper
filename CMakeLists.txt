@@ -12,9 +12,15 @@ endif()
 # set(USE_PYLON true)  # uncomment if using basler camera
 set(USE_LEAP true)  # uncomment if using leap motion
 
-set(Python_EXECUTABLE "C:/Users/yotam/AppData/Local/Programs/Python/Python311/python.exe")  # replace with a system python environment with numpy, mediapipe, and dev tools installed
+if(NOT DEFINED Python_EXECUTABLE)
+if(NOT DEFINED ENV{CONDA_PREFIX})
+message(FATAL_ERROR "Activate the Conda environment dm or set Python_EXECUTABLE.")
+endif()
+file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" CONDA_PREFIX_CMAKE)
+    set(Python_EXECUTABLE "${CONDA_PREFIX_CMAKE}/python.exe")
+endif()
 set(ULTRALEAP_PATH_ROOT "$ENV{ProgramFiles}/Ultraleap")
-set(OpenCV_DIR "C:/src/OpenCV/build")  # replace with opencv install path (e.g. "${CMAKE_SOURCE_DIR}/third-party/opencv", "C:/OpenCV/build")
+set(OpenCV_DIR "C:/src/OpenCV/build" CACHE PATH "Path to the OpenCV build directory")
 file(TO_CMAKE_PATH "$ENV{CUDA_PATH}" CUDA_TOOLKIT_ROOT_DIR)  # replaces # set(CUDA_TOOLKIT_ROOT_DIR $ENV{CUDA_PATH}) for normalizing the path
 file(TO_CMAKE_PATH "$ENV{PYLON_DEV_DIR}" PYLON_DEV_DIR)  # replaces # set(PYLON_DEV_DIR $ENV{PYLON_DEV_DIR}) for normalizing the path
 set(PYLON_RT_DIR "${PYLON_DEV_DIR}/../Runtime/x64")
@@ -28,7 +34,7 @@ find_package(pylon 7.3.0 REQUIRED)
 endif()
 find_package(OpenCV 4.6.0 EXACT REQUIRED)
 if (DEFINED USE_LEAP)
-    find_package(LeapSDK 5 REQUIRED PATHS "${ULTRALEAP_PATH_ROOT}")
+    find_package(LeapSDK REQUIRED PATHS "${ULTRALEAP_PATH_ROOT}")
 endif()
 if(DEFINED OpenCV_CUDA_VERSION)
     add_compile_definitions(OPENCV_WITH_CUDA)
