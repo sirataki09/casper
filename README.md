@@ -478,7 +478,7 @@ Windows環境で現在の依存関係を使用できるよう、次の変更を�
 - NumPyおよびMediaPipeの初期化
 - OpenGL 4.3ウィンドウの生成
 - `all_10s`からの3D手姿勢の読み込みと連続再生
-- `-simcam --simproj`の起動
+- `--simcam --simproj`の起動
 - OpenAI未設定状態でのシミュレーション継続
 
 Leap Motion、専用カメラ、プロジェクターを使用した実機投影とキャリブレーションは、今後の確認項目です。

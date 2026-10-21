@@ -8,7 +8,7 @@ except ImportError:
 try:
     import numpy as np
 except ImportError:
-    print("Numpy package is unavailable")
+    print("Numpy package is unavailable.")
 
 
 class ChatGPTClient:
