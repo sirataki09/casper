@@ -8,7 +8,7 @@ except ImportError:
 try:
     import numpy as np
 except ImportError:
-    print("Coudln't import numpy")
+    print("Numpy package is unavailable")
 
 
 class ChatGPTClient:
@@ -16,7 +16,7 @@ class ChatGPTClient:
         self.client = None
         apikey = os.getenv("OPENAI_API_KEY")
         if OpenAI is None:
-            print("Open package is unavailable; GPT features are disabled.")
+            print("OpenAI package is unavailable; GPT features are disabled.")
         elif not apikey:
             print("OpenAI API key is not configured; GPT features are disabled.")
         else:

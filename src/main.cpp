@@ -552,7 +552,7 @@ int main(int argc, char *argv[])
         PyErr_Print();
         return -1;
     }
-    single_detector = PyObject_CallFunction(init_detector, NULL);
+    
     /* init GLFW */
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
