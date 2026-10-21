@@ -226,6 +226,41 @@ cd /Users/takumi/ws/casper/build/bin
 
 MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single signature inference` という `W...` 行は、CPU推論バックエンドとモデル機能に関する通知です。Casperの初期化失敗ではありません。`ERROR::`、Python例外、OpenGLエラー、または終了コードが0以外の場合は、この節の成功状態とは異なります。
 
+## WindowsでCasperをビルドしてシミュレーションを動かす
+
+この章では、Windows 11上でCasperをビルドし、実機を使わずに保存済みの手姿勢を再生するまでの手順を説明します。
+
+### 1. この環境で確認した構成
+
+- Windows 11
+- Visual Studio 2022 Community
+- MSVC 19.44
+- Windows SDK 10.0.26100.0
+- CMake 4.4.4
+- Conda環境名: `dm`
+- Python 3.11.17
+- NumPy 1.26.4
+- MediaPipe
+- nanobind
+- OpenCV 4.6.0 Windows Pack
+- Ultraleap Hyperion 6.2.0
+
+### 2. Visual Studioを準備する
+
+Visual Studio InstallerからVisual Studio 2022 Communityをインストールし、次のコンポーネントを有効にします。
+
+- C++によるデスクトップ開発
+- MSVC x64/x86ビルドツール
+- Windows 10またはWindows 11 SDK
+- Windows用CMakeツール
+
+Git Bashでコンパイラの存在を確認できます。
+
+```bash
+find /c/Program\ Files/Microsoft\ Visual\ Studio/2022/Community/VC/Tools/MSVC \
+  -type f -name cl.exe 2>/dev/null
+```
+
 ## GitHubでmacOS版とWindows版を並行して管理する
 
 このリポジトリでは、公式リポジトリを`upstream`、個人のforkを`origin`として扱います。ブランチは次の役割に分けます。
