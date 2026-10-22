@@ -226,6 +226,263 @@ cd /Users/takumi/ws/casper/build/bin
 
 MediaPipeが出す `INFO` と、`Feedback manager requires a model with a single signature inference` という `W...` 行は、CPU推論バックエンドとモデル機能に関する通知です。Casperの初期化失敗ではありません。`ERROR::`、Python例外、OpenGLエラー、または終了コードが0以外の場合は、この節の成功状態とは異なります。
 
+## WindowsでCasperをビルドしてシミュレーションを動かす
+
+この章では、Windows 11上でCasperをビルドし、実機を使わずに保存済みの手姿勢を再生するまでの手順を説明します。
+
+### 1. この環境で確認した構成
+
+- Windows 11
+- Visual Studio 2022 Community
+- MSVC 19.44
+- Windows SDK 10.0.26100.0
+- CMake 4.4.4
+- Conda環境名: `dm`
+- Python 3.11.17
+- NumPy 1.26.4
+- MediaPipe
+- nanobind
+- OpenCV 4.6.0 Windows Pack
+- Ultraleap Hyperion 6.2.0
+
+### 2. Visual Studioを準備する
+
+Visual Studio InstallerからVisual Studio 2022 Communityをインストールし、次のコンポーネントを有効にします。
+
+- C++によるデスクトップ開発
+- MSVC x64/x86ビルドツール
+- Windows 10またはWindows 11 SDK
+- Windows用CMakeツール
+
+Git Bashでコンパイラの存在を確認できます。
+
+```bash
+find /c/Program\ Files/Microsoft\ Visual\ Studio/2022/Community/VC/Tools/MSVC \
+  -type f -name cl.exe 2>/dev/null
+```
+
+Windows SDKも確認します。
+
+```bash
+find /c/Program\ Files\ \(x86\)/Windows\ Kits/10/bin \
+  -type f -name rc.exe 2>/dev/null
+```
+
+### 3. CMakeを準備する
+
+CMakeが未導入の場合はPowerShellまたはコマンドプロンプトからインストールします。
+
+```powershell
+winget install Kitware.CMake
+```
+
+新しいGit Bashを開いて確認します。
+
+```bash
+cmake --version
+cmake --help | grep "Visual Studio 17 2022"
+```
+
+`cmake: command not found`になる場合は、次のコマンドで実際の配置場所を探し、その`bin`ディレクトリをGit BashのPATHへ追加します。
+
+```bash
+find /c/Program\ Files \
+  /c/Program\ Files\ \(x86\) \
+  /c/Users/takum/AppData/Local \
+  -type f -iname cmake.exe 2>/dev/null
+```
+
+この環境ではwinget版CMake 4.4.4を使用しました。
+
+### 4. Conda仮想環境`dm`を作る
+
+`PYTHONHOME`が設定済みの場合は、Condaを操作する前に解除します。
+
+```bash
+unset PYTHONHOME
+conda create -n dm python=3.11
+conda activate dm
+```
+
+必要なPythonパッケージを導入します。
+
+```bash
+python -m pip install "numpy==1.26.4" mediapipe nanobind
+```
+
+確認します。
+
+```bash
+python --version
+python -c "import numpy; print(numpy.__version__)"
+python -c "import mediapipe; print('MediaPipe OK')"
+python -m nanobind --cmake_dir
+python -c "import ctypes; print('ctypes OK')"
+```
+
+### 5. OpenCVを配置する
+
+OpenCV 4.6.0 Windows Packを展開し、次のファイルが存在する構成にします。
+
+```
+C:\src\opencv\build\OpenCVConfig.cmake
+C:\src\opencv\build\x64\vc15\bin\opencv_world460.dll
+```
+
+Git Bashでは次のように確認できます。
+
+```bash
+ls -l /c/src/opencv/build/OpenCVConfig.cmake
+ls -l /c/src/opencv/build/x64/vc15/bin/opencv_world460.dll
+```
+
+### 6. Ultraleap SDKを導入する
+
+Ultraleap公式サイトからWindows用Hyperionをインストールします。この環境ではHyperion 6.2.0を使用しました。
+
+既定のインストール先は次の場所です。
+
+```
+C:\Program Files\Ultraleap
+```
+
+SDKを確認します。
+
+```bash
+find /c/Program\ Files/Ultraleap/LeapSDK -type f \
+  \( -name LeapC.h -o -name LeapC.dll -o -name LeapC.lib -o -iname \*.cmake \) \
+  2>/dev/null
+```
+
+### 7. CMakeを構成する
+
+リポジトリへ移動し、`dm`を有効にします。
+
+```bash
+cd ~/casper
+unset PYTHONHOME
+conda activate dm
+```
+
+Visual Studio 2022用のビルドファイルを生成します。
+
+```bash
+cmake -S . -B build-windows \
+  -G "Visual Studio 17 2022" \
+  -T host=x64 \
+  -A x64 \
+  -DOpenCV_ARCH=x64 \
+  -DOpenCV_RUNTIME=vc15
+```
+
+`OpenCV_RUNTIME=vc15`は、OpenCV 4.6.0 Windows Packを現在のVisual Studio 2022から認識させるために指定しています。
+
+### 8. ビルドする
+
+必ずリポジトリのルート`~/casper`で実行します。
+
+```bash
+cmake --build build-windows \
+  --config Release \
+  --target ALL_BUILD \
+  --parallel 8
+```
+
+成功すると次の実行ファイルが生成されます。
+
+```
+C:\Users\takum\casper\build-windows\Release\casper.exe
+```
+
+### 9. 保存済み手姿勢を再生する
+
+Conda環境を有効にした後で`PYTHONHOME`を設定します。
+
+```bash
+cd ~/casper
+unset PYTHONHOME
+conda activate dm
+export PYTHONHOME="$CONDA_PREFIX"
+```
+
+`PYTHONHOME`の設定後に再び`conda activate`を実行すると、Conda本体がモジュールを見つけられなくなる場合があります。必ず「Condaを有効化、`PYTHONHOME`を設定、Casperを起動」の順番で実行します。
+
+```bash
+cd ~/casper/build-windows/Release
+./casper.exe --mode simulation
+```
+
+同梱されている`resource/recordings/all_10s`が読み込まれ、保存済みの3D手モデルが連続再生されます。右クリックすると設定GUIを表示できます。
+
+`all_10s`には手姿勢データだけがあり、実際のカメラ画像はありません。そのため手モデルの一部が黒く表示される場合があります。手の形が保たれ、姿勢に合わせて動いていれば正常です。
+
+### 10. 仮想カメラと仮想プロジェクター
+
+```bash
+cd ~/casper/build-windows/Release
+./casper.exe --simcam --simproj
+```
+
+この指定で仮想化されるのはカメラとプロジェクターです。Windows版では手姿勢入力にLeap Motion実機を使うため、Leap Motion未接続時は手が表示されません。
+
+実機なしで保存済み手姿勢を確認する場合は`--mode simulation`を使用します。
+
+### 11. 実行時のメッセージ
+
+次のMediaPipeメッセージは警告であり、手モデルが表示されていれば問題ありません。
+
+```
+Feedback manager requires a model with a single signature inference.
+Disabling support for feedback tensors.
+```
+
+OpenAIを導入していない場合はGPT機能だけが無効になります。
+
+```
+OpenAI package is unavailable; GPT features are disabled.
+```
+
+保存済み姿勢のシミュレーションにOpenAI APIキーは不要です。APIキー本体をREADME、ソースコード、ターミナル出力、Git履歴へ記録しないでください。
+
+`Ctrl+C`で停止すると、Python終了処理から`KeyboardInterrupt`が表示される場合があります。可能であればウィンドウの閉じるボタンで終了します。
+
+### 12. 公式リポジトリから変更した点（Windows）
+
+Windows環境で現在の依存関係を使用できるよう、次の変更を行いました。
+
+- `CMakeLists.txt`
+    - 開発者固有のPython絶対パスを廃止し、`CONDA_PREFIX`から`python.exe`を取得します。
+    - `OpenCV_DIR`をCMakeキャッシュ変数として指定可能にしました。
+    - Leap SDKの要求をバージョン5固定から、インストール済みの互換SDKを検索する指定へ変更しました。
+- `src/main.cpp`
+    - OpenCV 4.6とOpenCV 5のヘッダ構成差に対応しました。
+    - 組み込みPythonへCondaの`Library/bin`をDLL検索先として登録しました。
+    - PythonモジュールやMediaPipeの初期化失敗時に、NULL参照を続けず安全に終了します。
+- `include/diffuse.h`、`include/post_process.h`
+    - OpenCV 4とOpenCV 5で利用できる条件付きヘッダ読み込みにしました。
+- `include/engine_state.h`
+    - 存在しない`test`ではなく、同梱されている`all_10s`を初期記録データにしました。
+- `src/chatgpt.py`
+    - APIキー本体をターミナルへ表示しません。
+    - OpenAI未導入またはAPIキー未設定の場合、GPT機能だけを無効化して他の機能を継続します。
+
+### 13. Windowsで確認できた結果
+
+次の項目を確認しました。
+
+- Visual Studio 2022用プロジェクトの生成
+- Release構成での`casper.exe`ビルド
+- OpenCV 4.6.0の読み込み
+- Ultraleap SDK 6.2.0の読み込み
+- Conda環境`dm`の組み込みPython利用
+- NumPyおよびMediaPipeの初期化
+- OpenGL 4.3ウィンドウの生成
+- `all_10s`からの3D手姿勢の読み込みと連続再生
+- `--simcam --simproj`の起動
+- OpenAI未設定状態でのシミュレーション継続
+
+Leap Motion、専用カメラ、プロジェクターを使用した実機投影とキャリブレーションは、今後の確認項目です。
+
 ## GitHubでmacOS版とWindows版を並行して管理する
 
 このリポジトリでは、公式リポジトリを`upstream`、個人のforkを`origin`として扱います。ブランチは次の役割に分けます。

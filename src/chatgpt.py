@@ -4,24 +4,28 @@ import os  # Included to Python
 try:
     from openai import OpenAI
 except ImportError:
-    print("Coudln't import OpenAI")
+    OpenAI = None
 try:
     import numpy as np
 except ImportError:
-    print("Coudln't import numpy")
+    print("NumPy package is unavailable.")
 
 
 class ChatGPTClient:
     def __init__(self):
+        self.client = None
         apikey = os.getenv("OPENAI_API_KEY")
-        if apikey:
-            print("Found API key: {}".format(apikey))
-            self.client = OpenAI(api_key=apikey)
+        if OpenAI is None:
+            print("OpenAI package is unavailable; GPT features are disabled.")
+        elif not apikey:
+            print("OpenAI API key is not configured; GPT features are disabled.")
         else:
-            print("Couldn't find OpenAI API key.")
-            # raise Exception("API key not found")
+            print("OpenAI API key is configured.")
+            self.client = OpenAI(api_key=apikey)
 
     def send_request(self, encoded_image: str, select_top: bool) -> str:
+        if self.client is None:
+            return ""
         response = self.client.chat.completions.create(
             model="gpt-4-vision-preview",
             messages=[

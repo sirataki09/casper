@@ -14,7 +14,11 @@
 #include "cxxopts.h"
 #include "camera.h"
 #include "gl_camera.h"
+#if __has_include(<opencv2/geometry/3d.hpp>)
 #include <opencv2/geometry/3d.hpp>
+#else
+#include <opencv2/calib3d.hpp>
+#endif
 #include <nvtx3/nvtx3.hpp>
 #include "shader.h"
 #include "engine_state.h"
@@ -465,6 +469,22 @@ int main(int argc, char *argv[])
     }
     /* embedded python init */
     Py_Initialize();
+
+    #ifdef _WIN32
+    // Embedded Python must be told where Conda runtime DLLs are located.
+    if (PyRun_SimpleString(
+        "import os\n"
+        "_casper_conda_dll_directory = None\n"
+        "if os.environ.get('CONDA_PREFIX'):\n"
+        "    _casper_conda_dll_directory = os.add_dll_directory("
+        "os.path.join(os.environ['CONDA_PREFIX'], 'Library', 'bin'))\n") !=     0)
+    {
+        PyErr_Print();
+        std::cerr << "Failed to register the Conda DLL directory." << std::endl;
+        return -1;
+    }
+    #endif
+
 #ifdef CASPER_SIMULATION_ONLY
     // Embedded Python does not automatically activate a venv. Add both the
     // executable directory (predict.py/chatgpt.py) and dm's installed packages.
@@ -489,38 +509,50 @@ int main(int argc, char *argv[])
 #endif
     import_array();
     myModule = PyImport_ImportModule("predict");
+
     if (!myModule)
     {
-        std::cout << "Import module failed!";
+        std::cerr << "Failed to import predict module." << std::endl;
         PyErr_Print();
-        // exit(1);
+        return -1;
     }
     Py_INCREF(myModule);
-    predict_single = PyObject_GetAttrString(myModule, (char *)"predict_single");
+
+    predict_single = PyObject_GetAttrString(myModule, "predict_single");
     if (!predict_single)
     {
-        std::cout << "Import function failed!";
+        std::cerr << "Failed to load predict_single." << std::endl;
         PyErr_Print();
-        // exit(1);
+        return -1;
     }
     Py_INCREF(predict_single);
-    predict_video = PyObject_GetAttrString(myModule, (char *)"predict_video");
+
+    predict_video = PyObject_GetAttrString(myModule, "predict_video");
     if (!predict_video)
     {
-        std::cout << "Import function failed!";
+        std::cerr << "Failed to load predict_video." << std::endl;
         PyErr_Print();
-        // exit(1);
+        return -1;
     }
     Py_INCREF(predict_video);
-    init_detector = PyObject_GetAttrString(myModule, (char *)"init_detector");
+
+    init_detector = PyObject_GetAttrString(myModule, "init_detector");
     if (!init_detector)
     {
-        std::cout << "Import function failed!";
+        std::cerr << "Failed to load init_detector." << std::endl;
         PyErr_Print();
-        // exit(1);
+        return -1;
     }
     Py_INCREF(init_detector);
+
     single_detector = PyObject_CallFunction(init_detector, NULL);
+    if (!single_detector)
+    {
+        std::cerr << "Failed to initialize the MediaPipe detector." << std::endl;
+        PyErr_Print();
+        return -1;
+    }
+    
     /* init GLFW */
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
