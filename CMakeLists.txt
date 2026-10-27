@@ -12,6 +12,7 @@ endif()
 # set(USE_PYLON true)  # uncomment if using basler camera
 set(USE_LEAP true)  # uncomment if using leap motion
 option(USE_REALSENSE "Build the Intel RealSense D455 preflight tool" OFF)
+set(REALSENSE2_ROOT "" CACHE PATH "Root of an extracted RealSense SDK (contains include, lib, and bin)")
 
 if(NOT DEFINED Python_EXECUTABLE)
     if(NOT DEFINED ENV{CONDA_PREFIX})
@@ -34,7 +35,7 @@ if (DEFINED USE_PYLON)
 find_package(pylon 7.3.0 REQUIRED)
 endif()
 if (USE_REALSENSE)
-    find_package(realsense2 CONFIG REQUIRED)
+    find_package(realsense2 CONFIG QUIET)
     if (TARGET realsense2::realsense2)
         set(CASPER_REALSENSE_LIBRARY realsense2::realsense2)
     elseif (TARGET realsense2)
@@ -42,7 +43,19 @@ if (USE_REALSENSE)
     elseif (realsense2_LIBRARY)
         set(CASPER_REALSENSE_LIBRARY ${realsense2_LIBRARY})
     else()
-        message(FATAL_ERROR "RealSense SDK was found, but no link library target was exported.")
+        find_path(realsense2_INCLUDE_DIR
+                  NAMES librealsense2/rs.hpp
+                  HINTS "${REALSENSE2_ROOT}/include")
+        find_library(CASPER_REALSENSE_LIBRARY
+                     NAMES realsense2
+                     HINTS "${REALSENSE2_ROOT}/lib/x64")
+        if (NOT realsense2_INCLUDE_DIR OR NOT CASPER_REALSENSE_LIBRARY)
+            message(FATAL_ERROR
+                    "RealSense SDK development files were not found. Install the SDK package or set "
+                    "REALSENSE2_ROOT to a directory containing include/librealsense2/rs.hpp and "
+                    "lib/x64/realsense2.lib.")
+        endif()
+        message(STATUS "Using extracted RealSense SDK from ${REALSENSE2_ROOT}")
     endif()
 endif()
 find_package(OpenCV 4.6.0 EXACT REQUIRED)
@@ -462,8 +475,14 @@ if(NOT RES_LEN EQUAL 0)
 endif()
 
 if (USE_REALSENSE AND WIN32)
+    if (REALSENSE2_ROOT)
+        set(REALSENSE2_RUNTIME_DEFAULT "${REALSENSE2_ROOT}/bin/x64")
+    else()
+        set(REALSENSE2_RUNTIME_DEFAULT
+            "C:/Program Files (x86)/Intel RealSense SDK 2.0/bin/x64")
+    endif()
     set(REALSENSE2_RUNTIME_DIR
-        "C:/Program Files (x86)/Intel RealSense SDK 2.0/bin/x64"
+        "${REALSENSE2_RUNTIME_DEFAULT}"
         CACHE PATH "Directory containing realsense2.dll")
     find_file(REALSENSE2_RUNTIME_DLL
               NAMES realsense2.dll

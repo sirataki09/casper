@@ -538,6 +538,24 @@ cmake --build build-windows \
   --parallel 4
 ```
 
+SDKを任意のフォルダへ展開し、`realsense2Config.cmake`が含まれていない場合も利用できます。
+例えば`C:\Users\takum`直下に`include`、`lib`、`bin`が展開されている場合は、
+`realsense2_DIR`の代わりに次を指定します。
+
+```bash
+cmake -S . -B build-windows \
+  -G "Visual Studio 17 2022" \
+  -T host=x64 \
+  -A x64 \
+  -DOpenCV_ARCH=x64 \
+  -DOpenCV_RUNTIME=vc15 \
+  -DUSE_REALSENSE=ON \
+  -DREALSENSE2_ROOT="C:/Users/takum"
+```
+
+この場合、`include/librealsense2/rs.hpp`、`lib/x64/realsense2.lib`、
+`bin/x64/realsense2.dll`を検出します。SDKファイルを手動で移動する必要はありません。
+
 8 GBのPCでは、他のアプリケーションを終了し、並列数を`4`程度に抑えます。
 
 #### 14.3 D455の赤外線ストリームを確認する
@@ -663,6 +681,7 @@ D455による2D補正、カメラ・プロジェクター校正、Leap・カメ�
     - `USE_REALSENSE`オプションを追加しました。
     - RealSense SDKを検出した場合だけD455診断プログラムをビルドします。
     - D455およびHDMIプロジェクター診断プログラムへ必要なDLLをコピーします。
+    - CMake設定ファイルを含まない展開型RealSense SDKを`REALSENSE2_ROOT`から検出できます。
 - `include/engine_state.h`、`include/display.h`、`src/main.cpp`
     - `--screenproj`、`--fullscreen`、`--monitor`を追加しました。
     - 一般的なHDMIプロジェクターでは、CasperのGLFWウィンドウを投影面として使用します。
