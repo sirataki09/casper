@@ -423,6 +423,12 @@ int main(int argc, char *argv[])
          cxxopts::value<std::string>()->default_value("../../resource/Default.fbx"))                                              //
         ("simcam", "A simulated camera is used", cxxopts::value<bool>()->default_value("false"))                                  //
         ("simproj", "A simulated projector is used", cxxopts::value<bool>()->default_value("false"))                              //
+        ("screenproj", "Render projector output only in the Casper window (for an HDMI projector)",                              //
+         cxxopts::value<bool>()->default_value("false"))                                                                          //
+        ("fullscreen", "Open the Casper output fullscreen on the selected monitor",                                               //
+         cxxopts::value<bool>()->default_value("false"))                                                                          //
+        ("monitor", "GLFW monitor index used for window or fullscreen output; -1 selects the last monitor",                       //
+         cxxopts::value<int>()->default_value("-1"))                                                                               //
         ("emesh", "A .fbx mesh file to use for hot swapping (used in some apps)",                                                 //
          cxxopts::value<std::string>()->default_value("../../resource/GuessCharGame_palm.fbx"))                                   //
         ("h,help", "Prints usage")                                                                                                //
@@ -439,6 +445,11 @@ int main(int argc, char *argv[])
         es.extraMeshFile = result["emesh"].as<std::string>();
         es.simulated_camera = result["simcam"].as<bool>();
         es.simulated_projector = result["simproj"].as<bool>();
+        es.screen_projector = result["screenproj"].as<bool>();
+        es.fullscreen_output = result["fullscreen"].as<bool>();
+        es.output_monitor = result["monitor"].as<int>();
+        if (es.screen_projector)
+            es.simulated_projector = true;
         es.proj_channel_order = es.simulated_projector ? GL_RGB : GL_BGR;
         std::unordered_map<std::string, int> mode_map{
             {"sandbox", static_cast<int>(OperationMode::SANDBOX)},
@@ -566,15 +577,49 @@ int main(int argc, char *argv[])
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE); // disable resizing
     int num_of_monitors;
     GLFWmonitor **monitors = glfwGetMonitors(&num_of_monitors);
-    GLFWwindow *window = glfwCreateWindow(es.proj_width, es.proj_height, "casper", NULL, NULL); // monitors[0], NULL for full screen
-    int secondary_screen_x, secondary_screen_y;
-    glfwGetMonitorPos(monitors[num_of_monitors - 1], &secondary_screen_x, &secondary_screen_y);
-    glfwSetWindowPos(window, secondary_screen_x + 300, secondary_screen_y + 100);
+    if (!monitors || num_of_monitors == 0)
+    {
+        std::cout << "No display monitor was detected by GLFW" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    std::cout << "Detected monitors:" << std::endl;
+    for (int monitor_index = 0; monitor_index < num_of_monitors; ++monitor_index)
+    {
+        int monitor_x = 0;
+        int monitor_y = 0;
+        glfwGetMonitorPos(monitors[monitor_index], &monitor_x, &monitor_y);
+        const GLFWvidmode *monitor_mode = glfwGetVideoMode(monitors[monitor_index]);
+        const char *monitor_name = glfwGetMonitorName(monitors[monitor_index]);
+        std::cout << "  [" << monitor_index << "] " << (monitor_name ? monitor_name : "Unknown monitor")
+                  << " position=(" << monitor_x << ", " << monitor_y << ")";
+        if (monitor_mode)
+            std::cout << " mode=" << monitor_mode->width << "x" << monitor_mode->height
+                      << " @ " << monitor_mode->refreshRate << " Hz";
+        std::cout << std::endl;
+    }
+    int selected_monitor = es.output_monitor < 0 ? num_of_monitors - 1 : es.output_monitor;
+    if (selected_monitor < 0 || selected_monitor >= num_of_monitors)
+    {
+        std::cout << "Invalid --monitor index " << selected_monitor
+                  << "; expected a value from 0 to " << num_of_monitors - 1 << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    GLFWmonitor *fullscreen_monitor = es.fullscreen_output ? monitors[selected_monitor] : nullptr;
+    GLFWwindow *window = glfwCreateWindow(es.proj_width, es.proj_height, "casper", fullscreen_monitor, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
+    }
+    if (!es.fullscreen_output)
+    {
+        int output_x = 0;
+        int output_y = 0;
+        glfwGetMonitorPos(monitors[selected_monitor], &output_x, &output_y);
+        glfwSetWindowPos(window, output_x + 50, output_y + 50);
     }
     glfwMakeContextCurrent(window);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -595,7 +640,7 @@ int main(int argc, char *argv[])
     // the virtual Sandbox from consuming an entire CPU core unnecessarily.
     glfwSwapInterval(1);
 #else
-    glfwSwapInterval(0);                             // do not sync to monitor
+    glfwSwapInterval(es.screen_projector ? 1 : 0); // HDMI output follows its display refresh; DynaFlash does not
 #endif
     glViewport(0, 0, es.proj_width, es.proj_height); // set viewport
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -942,7 +987,10 @@ int main(int argc, char *argv[])
     toBakeTexture.init(es.dst_width, es.dst_height, 4);
     if (es.simulated_projector)
     {
-        projector = new SaveToDisk("../../debug/video/", es.proj_height, es.proj_width);
+        if (es.screen_projector)
+            projector = new ScreenDisplay(es.proj_height, es.proj_width);
+        else
+            projector = new SaveToDisk("../../debug/video/", es.proj_height, es.proj_width);
     }
     else
     {

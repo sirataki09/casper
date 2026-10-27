@@ -81,6 +81,21 @@ private:
     // bool m_save_to_disk = false;
 };
 
+// The Casper GLFW window already renders the final projector-space frame.
+// This backend deliberately performs no additional copy or file write, so an
+// ordinary HDMI projector can use that window as its output surface.
+class ScreenDisplay : public Display
+{
+public:
+    ScreenDisplay(int height, int width, int channels = 3, bool verbose = false)
+        : Display(height, width, channels, verbose) {}
+    bool init() override { return true; }
+    void show() override {}
+    void show(cv::Mat) override {}
+    void show_buffer(uint8_t *) override {}
+    void kill() override {}
+};
+
 #ifdef _WIN32
 class DynaFlashProjector : public Display
 {

@@ -604,22 +604,69 @@ cd ~/casper/build-windows/Release
   --windowed
 ```
 
-#### 14.5 実機確認の合格条件
+#### 14.5 Leap MotionからHDMIプロジェクターへの簡易投影
+
+Leap MotionとHDMIプロジェクターが個別に動いたら、D455補正なしの簡易投影を試せます。
+`--screenproj`はCasperの最終フレームをメインのGLFWウィンドウだけへ描画し、
+DynaFlashへの接続や`debug/video`への連続PNG保存を行いません。起動時に表示される
+`Detected monitors`の番号からHDMIプロジェクターを選びます。
+
+まずウィンドウ表示で対象画面を確認します。次の`1`は例なので、実際に表示された番号へ
+置き換えてください。
+
+```bash
+cd ~/casper
+unset PYTHONHOME
+conda activate dm
+export PYTHONHOME="$CONDA_PREFIX"
+cd build-windows/Release
+
+./casper.exe \
+  --simcam \
+  --screenproj \
+  --monitor 1
+```
+
+正しいプロジェクター画面に表示されたら全画面にします。
+
+```bash
+./casper.exe \
+  --simcam \
+  --screenproj \
+  --fullscreen \
+  --monitor 1
+```
+
+このモードで実機なのはLeap MotionとHDMIプロジェクターです。カメラは白い仮想画像で、
+D455による2D補正、カメラ・プロジェクター校正、Leap・カメラ校正はまだ適用されません。
+そのため、最初は手を静止させ、プロジェクターの向き、距離、手の位置を動かして、
+一つの姿勢でおおまかに重なる位置を探します。成功条件は、3D手モデル由来の光が実手付近へ
+投影され、手をゆっくり動かしたときに同じ方向へ追従することです。輪郭が正確に一致することは
+この段階の成功条件ではありません。
+
+プロジェクター光を目へ向けず、最初は低い明るさで確認してください。
+
+#### 14.6 実機確認の合格条件
 
 次を個別に確認してから、D455とHDMIプロジェクターをCasper本体へ統合します。
 
 - Ultraleap Visualizerで実手の骨格が安定して動く。
 - `casper.exe --simcam --simproj`で実Leap入力に3D手モデルが追従する。
+- `casper.exe --simcam --screenproj`でCasperの最終フレームがHDMI画面へ連続表示される。
 - `realsense_probe.exe`でIR画像と実測FPSが継続表示される。
 - Leap MotionとD455の同時接続中に切断や大きな追跡悪化がない。
 - `projector_probe.exe`の格子が目的のHDMIプロジェクター全面に表示される。
 
-#### 14.6 公式リポジトリから変更した点（実機事前確認）
+#### 14.7 公式リポジトリから変更した点（実機事前確認）
 
 - `CMakeLists.txt`
     - `USE_REALSENSE`オプションを追加しました。
     - RealSense SDKを検出した場合だけD455診断プログラムをビルドします。
     - D455およびHDMIプロジェクター診断プログラムへ必要なDLLをコピーします。
+- `include/engine_state.h`、`include/display.h`、`src/main.cpp`
+    - `--screenproj`、`--fullscreen`、`--monitor`を追加しました。
+    - 一般的なHDMIプロジェクターでは、CasperのGLFWウィンドウを投影面として使用します。
+    - `--screenproj`中はDynaFlash処理と連続PNG保存を行いません。
 - `src/realsense_probe.cpp`
     - 公式には存在しないD455代替機材用の診断プログラムです。
     - IRストリーム一覧、Y8画像、フレーム番号、機器タイムスタンプ、実測FPSを確認できます。
@@ -627,9 +674,10 @@ cd ~/casper/build-windows/Release
     - DynaFlash以外の一般的なHDMIプロジェクター用の診断プログラムです。
     - これは低遅延投影バックエンドではなく、表示経路と画面座標の確認用です。
 
-現時点ではD455画像をCasperのMLS補正へ入力する処理と、一般的なHDMIプロジェクターへ
-Casperの最終フレームを連続出力する処理は未実装です。実機事前確認で得た解像度、FPS、
-画面座標、IR干渉の結果を用いて次の段階で実装します。
+現時点ではD455画像をCasperのMLS補正へ入力する処理は未実装です。HDMI出力は
+CasperのGLFWウィンドウを全画面表示する簡易経路であり、DynaFlashと同等の専用転送、
+低遅延制御、同期機能はありません。実機事前確認で得た解像度、FPS、画面座標、
+IR干渉の結果を用いて次の段階でD455補正を実装します。
 
 ## GitHubでmacOS版とWindows版を並行して管理する
 

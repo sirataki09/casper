@@ -23,6 +23,9 @@ public:
     bool use_cuda = false;
     bool simulated_camera = false;
     bool simulated_projector = false;
+    bool screen_projector = false;
+    bool fullscreen_output = false;
+    int output_monitor = -1;
     int proj_channel_order = simulated_projector ? GL_RGB : GL_BGR;
     bool freecam_mode = false;
     bool use_pbo = true;
