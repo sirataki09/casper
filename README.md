@@ -483,6 +483,154 @@ Windows環境で現在の依存関係を使用できるよう、次の変更を�
 
 Leap Motion、専用カメラ、プロジェクターを使用した実機投影とキャリブレーションは、今後の確認項目です。
 
+### 14. D455とHDMIプロジェクターの実機事前確認
+
+論文および公式CasperはBaslerカメラとDynaFlashプロジェクターを使用します。
+このリポジトリでは、代替候補であるIntel RealSense D455と一般的なHDMIプロジェクターを
+Casper本体へ統合する前に個別確認できるよう、次の診断プログラムを追加しています。
+
+- `realsense_probe.exe`: D455の赤外線映像、USB接続、実測FPS、IRエミッターを確認します。
+- `projector_probe.exe`: Windowsの拡張画面へ格子、カラーバー、白、黒を表示します。
+
+これらはCasper本体の投影処理ではありません。機器またはSDKの問題とCasper本体の問題を
+切り分けるための事前確認用です。
+
+#### 14.1 RealSense SDK 2.0を導入する
+
+RealSense公式リリースからWindows用`RealSense.SDK.exe`をインストールします。
+通常は次のディレクトリにSDKが配置されます。
+
+```text
+C:\Program Files (x86)\Intel RealSense SDK 2.0
+```
+
+Git BashでCMake設定ファイルと実行時DLLを探します。
+
+```bash
+find "/c/Program Files (x86)/Intel RealSense SDK 2.0" \
+  -type f \( -iname realsense2Config.cmake -o -iname realsense2.dll \) \
+  2>/dev/null
+```
+
+#### 14.2 診断プログラムを構成・ビルドする
+
+既存のWindowsビルドへ`USE_REALSENSE`を追加して再構成します。
+`realsense2Config.cmake`が自動検出されない場合は、上の`find`で表示されたファイルの
+親ディレクトリを`realsense2_DIR`へ指定してください。
+
+```bash
+cd ~/casper
+unset PYTHONHOME
+conda activate dm
+
+cmake -S . -B build-windows \
+  -G "Visual Studio 17 2022" \
+  -T host=x64 \
+  -A x64 \
+  -DOpenCV_ARCH=x64 \
+  -DOpenCV_RUNTIME=vc15 \
+  -DUSE_REALSENSE=ON \
+  -Drealsense2_DIR="C:/Program Files (x86)/Intel RealSense SDK 2.0/CMake"
+
+cmake --build build-windows \
+  --config Release \
+  --target realsense_probe projector_probe \
+  --parallel 4
+```
+
+8 GBのPCでは、他のアプリケーションを終了し、並列数を`4`程度に抑えます。
+
+#### 14.3 D455の赤外線ストリームを確認する
+
+D455をUSBハブではなくUSB 3ポートへ直接接続します。最初に利用可能な赤外線モードを
+一覧表示します。
+
+```bash
+cd ~/casper/build-windows/Release
+./realsense_probe.exe --list
+```
+
+標準の確認はInfrared 1、848x480、30 FPS、Y8形式です。
+
+```bash
+./realsense_probe.exe --stream 1 --width 848 --height 480 --fps 30
+```
+
+操作方法は次のとおりです。
+
+- `Q`または`Esc`: 終了
+- `S`: 現在のフレームを`d455_ir.png`へ保存
+- `E`: 対応機種ではIRエミッターのオン・オフを切り替え
+
+Leap Motionとの赤外線干渉を比較する場合は、D455のエミッターを無効にして起動します。
+
+```bash
+./realsense_probe.exe \
+  --stream 1 --width 848 --height 480 --fps 30 \
+  --disable-emitter
+```
+
+指定モードがD455で提供されていない場合、プログラム冒頭に表示される
+`Available infrared profiles`から解像度とFPSを選び直します。
+
+#### 14.4 HDMIプロジェクターを確認する
+
+Windowsの「設定 > システム > ディスプレイ」で、プロジェクターを
+「表示画面を拡張する」に設定します。ディスプレイ配置でプロジェクターの左上座標を確認し、
+`--x`と`--y`へ指定します。ノートPC画面が1920x1080で、プロジェクターがその右側なら
+開始座標は通常`1920,0`です。
+
+```bash
+cd ~/casper/build-windows/Release
+./projector_probe.exe \
+  --x 1920 --y 0 \
+  --width 1024 --height 768
+```
+
+操作方法は次のとおりです。
+
+- `1`: 格子と中央十字
+- `2`: カラーバー
+- `3`: 白
+- `4`: 黒
+- `Q`または`Esc`: 終了
+
+異なる画面に出る場合は、まずウィンドウ表示で座標を調べます。
+
+```bash
+./projector_probe.exe \
+  --x 1920 --y 0 \
+  --width 1024 --height 768 \
+  --windowed
+```
+
+#### 14.5 実機確認の合格条件
+
+次を個別に確認してから、D455とHDMIプロジェクターをCasper本体へ統合します。
+
+- Ultraleap Visualizerで実手の骨格が安定して動く。
+- `casper.exe --simcam --simproj`で実Leap入力に3D手モデルが追従する。
+- `realsense_probe.exe`でIR画像と実測FPSが継続表示される。
+- Leap MotionとD455の同時接続中に切断や大きな追跡悪化がない。
+- `projector_probe.exe`の格子が目的のHDMIプロジェクター全面に表示される。
+
+#### 14.6 公式リポジトリから変更した点（実機事前確認）
+
+- `CMakeLists.txt`
+    - `USE_REALSENSE`オプションを追加しました。
+    - RealSense SDKを検出した場合だけD455診断プログラムをビルドします。
+    - D455およびHDMIプロジェクター診断プログラムへ必要なDLLをコピーします。
+- `src/realsense_probe.cpp`
+    - 公式には存在しないD455代替機材用の診断プログラムです。
+    - IRストリーム一覧、Y8画像、フレーム番号、機器タイムスタンプ、実測FPSを確認できます。
+- `src/projector_probe.cpp`
+    - DynaFlash以外の一般的なHDMIプロジェクター用の診断プログラムです。
+    - これは低遅延投影バックエンドではなく、表示経路と画面座標の確認用です。
+
+現時点ではD455画像をCasperのMLS補正へ入力する処理と、一般的なHDMIプロジェクターへ
+Casperの最終フレームを連続出力する処理は未実装です。実機事前確認で得た解像度、FPS、
+画面座標、IR干渉の結果を用いて次の段階で実装します。
+
 ## GitHubでmacOS版とWindows版を並行して管理する
 
 このリポジトリでは、公式リポジトリを`upstream`、個人のforkを`origin`として扱います。ブランチは次の役割に分けます。

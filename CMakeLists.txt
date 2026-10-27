@@ -11,6 +11,7 @@ endif()
 
 # set(USE_PYLON true)  # uncomment if using basler camera
 set(USE_LEAP true)  # uncomment if using leap motion
+option(USE_REALSENSE "Build the Intel RealSense D455 preflight tool" OFF)
 
 if(NOT DEFINED Python_EXECUTABLE)
     if(NOT DEFINED ENV{CONDA_PREFIX})
@@ -31,6 +32,18 @@ project(casper VERSION 0.1 LANGUAGES C CXX)
 find_package(Python 3.9 COMPONENTS Interpreter Development NumPy REQUIRED)
 if (DEFINED USE_PYLON)
 find_package(pylon 7.3.0 REQUIRED)
+endif()
+if (USE_REALSENSE)
+    find_package(realsense2 CONFIG REQUIRED)
+    if (TARGET realsense2::realsense2)
+        set(CASPER_REALSENSE_LIBRARY realsense2::realsense2)
+    elseif (TARGET realsense2)
+        set(CASPER_REALSENSE_LIBRARY realsense2)
+    elseif (realsense2_LIBRARY)
+        set(CASPER_REALSENSE_LIBRARY ${realsense2_LIBRARY})
+    else()
+        message(FATAL_ERROR "RealSense SDK was found, but no link library target was exported.")
+    endif()
 endif()
 find_package(OpenCV 4.6.0 EXACT REQUIRED)
 if (DEFINED USE_LEAP)
@@ -178,6 +191,23 @@ target_link_libraries(casper PRIVATE Python::Python Python::NumPy)
 # NVTX
 add_subdirectory("${PROJECT_SOURCE_DIR}/third-party/NVTX-3.1.0-c-cpp")
 target_link_libraries(casper PRIVATE nvtx3-cpp)
+
+################ hardware preflight tools
+# These executables intentionally stay separate from Casper.  They let us
+# verify the replacement D455 and an ordinary HDMI projector before changing
+# the upstream Basler/DynaFlash runtime paths.
+add_executable(projector_probe
+    src/projector_probe.cpp
+)
+target_link_libraries(projector_probe PRIVATE ${OpenCV_LIBS})
+
+if (USE_REALSENSE)
+    add_executable(realsense_probe
+        src/realsense_probe.cpp
+    )
+    target_include_directories(realsense_probe PRIVATE ${realsense2_INCLUDE_DIR})
+    target_link_libraries(realsense_probe PRIVATE ${CASPER_REALSENSE_LIBRARY} ${OpenCV_LIBS})
+endif()
 ####################################### registration example
 # add_executable(registration_example 
 #     src/registration_example.cpp
@@ -415,11 +445,41 @@ file(GLOB OPENCV_DLLS "${OpenCV_DIR}/x64/${OpenCV_RUNTIME}/bin/*.dll")
 # message(OPENCV_DLLS="${OPENCV_DLLS}")
 list(LENGTH OPENCV_DLLS RES_LEN)
 if(NOT RES_LEN EQUAL 0)
-    add_custom_command(TARGET casper 
-                        POST_BUILD
-                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        ${OPENCV_DLLS}
-                        $<TARGET_FILE_DIR:casper>)
+    foreach(CASPER_OPENCV_TARGET casper projector_probe)
+        add_custom_command(TARGET ${CASPER_OPENCV_TARGET}
+                           POST_BUILD
+                           COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                           ${OPENCV_DLLS}
+                           $<TARGET_FILE_DIR:${CASPER_OPENCV_TARGET}>)
+    endforeach()
+    if (USE_REALSENSE)
+        add_custom_command(TARGET realsense_probe
+                           POST_BUILD
+                           COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                           ${OPENCV_DLLS}
+                           $<TARGET_FILE_DIR:realsense_probe>)
+    endif()
+endif()
+
+if (USE_REALSENSE AND WIN32)
+    set(REALSENSE2_RUNTIME_DIR
+        "C:/Program Files (x86)/Intel RealSense SDK 2.0/bin/x64"
+        CACHE PATH "Directory containing realsense2.dll")
+    find_file(REALSENSE2_RUNTIME_DLL
+              NAMES realsense2.dll
+              PATHS "${REALSENSE2_RUNTIME_DIR}"
+              NO_DEFAULT_PATH)
+    if (REALSENSE2_RUNTIME_DLL)
+        add_custom_command(TARGET realsense_probe
+                           POST_BUILD
+                           COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                           "${REALSENSE2_RUNTIME_DLL}"
+                           $<TARGET_FILE_DIR:realsense_probe>)
+    else()
+        message(WARNING
+                "realsense2.dll was not found in REALSENSE2_RUNTIME_DIR; "
+                "the SDK bin directory must be on PATH when realsense_probe runs.")
+    endif()
 endif()
 
 file(GLOB DYNAFLASH_DLLS "${PROJECT_SOURCE_DIR}/third-party/dynaflash/lib/*.dll")
